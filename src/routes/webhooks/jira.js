@@ -1,4 +1,6 @@
+import { launchAgent } from '../../lib/cursor-agent.js';
 import { createDedupeStore } from '../../lib/dedupe-store.js';
+import { getPromptFromJiraPayload } from '../../lib/jira-prompt.js';
 import { detectTodoToInProgress } from '../../lib/jira-webhook.js';
 import { verifyJiraSignature } from '../../lib/verify-jira-signature.js';
 
@@ -42,6 +44,23 @@ export async function jiraWebhook(request, reply) {
       { issueKey: transition.issueKey, from: transition.from, to: transition.to },
       'DO IT!'
     );
+    const prompt = getPromptFromJiraPayload(body, {
+      jiraBaseUrl: process.env.JIRA_BASE_URL,
+      ghRepoField: process.env.JIRA_GH_REPO_FIELD || 'gh_repo',
+    });
+    if (prompt) {
+      launchAgent({
+        promptText: prompt.text,
+        issueKey: prompt.issueKey,
+        repo: prompt.repo,
+        log: request.log.bind(request),
+      });
+    } else {
+      request.log.info(
+        { issueKey: transition.issueKey },
+        'cursor agent skipped: no summary or description in payload'
+      );
+    }
   }
 
   return reply.code(200).send({ received: true });
