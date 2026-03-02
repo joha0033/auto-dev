@@ -3,22 +3,7 @@ import { Readable } from 'stream';
 import Fastify from 'fastify';
 import { jiraWebhook } from './routes/webhooks/jira.js';
 
-const isProduction = process.env.NODE_ENV === 'production';
-
-const loggerConfig = isProduction
-  ? true
-  : {
-      transport: {
-        target: 'pino-pretty',
-        options: {
-          colorize: true,
-          translateTime: 'SYS:HH:MM:ss',
-          ignore: 'pid,hostname',
-        },
-      },
-    };
-
-const fastify = Fastify({ logger: loggerConfig });
+const fastify = Fastify({ logger: false });
 
 fastify.addHook('preParsing', async (request, reply, payload) => {
   const path = request.url?.split('?')[0];
@@ -39,8 +24,7 @@ fastify.post('/webhooks/jira', jiraWebhook);
 const start = async () => {
   try {
     await fastify.listen({ port: 3000, host: '0.0.0.0' });
-  } catch (err) {
-    fastify.log.error(err);
+  } catch {
     process.exit(1);
   }
 };
