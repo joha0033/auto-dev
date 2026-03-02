@@ -7,8 +7,8 @@ function normalizeStatus(s) {
   return s.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-const TODO_ALIASES = ['to do', 'todo', 'to_do'];
-const IN_PROGRESS_ALIASES = ['in progress', 'inprogress', 'in_progress'];
+const TODO_ALIASES = ['to do', 'todo', 'to_do', 'open', 'backlog'];
+const IN_PROGRESS_ALIASES = ['in progress', 'inprogress', 'in_progress', 'in development'];
 
 function isTodo(name) {
   const n = normalizeStatus(name);
@@ -22,25 +22,57 @@ function isInProgress(name) {
 
 /**
  * @param {object} payload - Jira webhook body (with webhookEvent, issue, changelog)
- * @returns {{ detected: boolean, issueKey?: string, from?: string, to?: string }}
+ * @returns {{ detected: boolean, issueKey?: string, from?: string, to?: string, debug?: { webhookEvent?: string, statusFrom?: string, statusTo?: string, hasStatusChange: boolean } }}
  */
 export function detectTodoToInProgress(payload) {
-  if (payload?.webhookEvent !== 'jira:issue_updated') {
-    return { detected: false };
+  const issueKey = payload?.issue?.key;
+  const webhookEvent = payload?.webhookEvent;
+
+  // Jira Cloud may send "jira:issue_updated" or "issue_updated"
+  const isIssueUpdated =
+    webhookEvent === 'jira:issue_updated' || webhookEvent === 'issue_updated';
+  if (!isIssueUpdated) {
+    return {
+      detected: false,
+      issueKey,
+      debug: { webhookEvent, hasStatusChange: false },
+    };
   }
 
-  const issueKey = payload.issue?.key;
   const items = payload.changelog?.items ?? [];
   const statusChange = items.find((item) => item.field === 'status');
 
-  if (!statusChange) return { detected: false, issueKey };
+  if (!statusChange) {
+    return {
+      detected: false,
+      issueKey,
+      debug: {
+        webhookEvent,
+        hasStatusChange: false,
+        changelogItemFields: items.map((i) => i.field),
+      },
+    };
+  }
 
   const from = statusChange.fromString ?? statusChange.from;
   const to = statusChange.toString ?? statusChange.to;
+  const fromStr = typeof from === 'string' ? from : String(from ?? '');
+  const toStr = typeof to === 'string' ? to : String(to ?? '');
 
-  if (isTodo(from) && isInProgress(to)) {
-    return { detected: true, issueKey, from: statusChange.fromString ?? from, to: statusChange.toString ?? to };
+  if (isTodo(fromStr) && isInProgress(toStr)) {
+    return { detected: true, issueKey, from: statusChange.fromString ?? fromStr, to: statusChange.toString ?? toStr };
   }
 
-  return { detected: false, issueKey };
+  return {
+    detected: false,
+    issueKey,
+    debug: {
+      webhookEvent,
+      hasStatusChange: true,
+      statusFrom: fromStr,
+      statusTo: toStr,
+      fromNormalized: normalizeStatus(fromStr),
+      toNormalized: normalizeStatus(toStr),
+    },
+  };
 }

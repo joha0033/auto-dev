@@ -3,13 +3,26 @@ import { Readable } from 'stream';
 import Fastify from 'fastify';
 import { jiraWebhook } from './routes/webhooks/jira.js';
 
-const fastify = Fastify({ logger: true });
+const isProduction = process.env.NODE_ENV === 'production';
 
-const JIRA_WEBHOOK_PATHS = ['/webhooks/jira', '/webooks/jira'];
+const loggerConfig = isProduction
+  ? true
+  : {
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+          translateTime: 'SYS:HH:MM:ss',
+          ignore: 'pid,hostname',
+        },
+      },
+    };
+
+const fastify = Fastify({ logger: loggerConfig });
 
 fastify.addHook('preParsing', async (request, reply, payload) => {
   const path = request.url?.split('?')[0];
-  if (request.method !== 'POST' || !JIRA_WEBHOOK_PATHS.includes(path)) return payload;
+  if (request.method !== 'POST' || path !== '/webhooks/jira') return payload;
   const chunks = [];
   for await (const chunk of payload) chunks.push(chunk);
   const raw = Buffer.concat(chunks);
@@ -19,8 +32,9 @@ fastify.addHook('preParsing', async (request, reply, payload) => {
 
 fastify.get('/', async () => ({ hello: 'world' }));
 
+fastify.get('/health', async () => ({ status: 'ok' }));
+
 fastify.post('/webhooks/jira', jiraWebhook);
-fastify.post('/webooks/jira', jiraWebhook);
 
 const start = async () => {
   try {

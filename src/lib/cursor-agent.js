@@ -19,6 +19,13 @@ export function launchAgent({ promptText, issueKey, repo, log = console }) {
   const repository = repo ?? process.env.CURSOR_REPO;
   const ref = process.env.CURSOR_REF ?? 'main';
 
+  if (typeof log.info === 'function') {
+    log.info(
+      { issueKey, repoFromTicket: repo ?? null, cursorRepoSet: Boolean(process.env.CURSOR_REPO), repository },
+      'agent_repo: launchAgent repository resolution'
+    );
+  }
+
   if (!apiKey || !repository) {
     const msg = 'cursor agent skipped: CURSOR_API_KEY and repo (gh_repo on ticket or CURSOR_REPO) are required';
     const data = { hasKey: Boolean(apiKey), hasRepo: Boolean(repository) };
@@ -40,6 +47,38 @@ export function launchAgent({ promptText, issueKey, repo, log = console }) {
     }),
   };
 
+  // Log the prompt and request payload (no API key) for debugging
+  if (typeof log.info === 'function') {
+    log.info(
+      {
+        issueKey,
+        promptText,
+        promptLength: typeof promptText === 'string' ? promptText.length : 0,
+        requestBody: body,
+      },
+      'cursor agent request (sending prompt)'
+    );
+  } else {
+    log(
+      {
+        issueKey,
+        promptText,
+        promptLength: typeof promptText === 'string' ? promptText.length : 0,
+        requestBody: body,
+      },
+      'cursor agent request (sending prompt)'
+    );
+  }
+
+  if (process.env.NO_CURSOR_CALL) {
+    if (typeof log.info === 'function') {
+      log.info({ issueKey, repository }, 'cursor agent skipped: NO_CURSOR_CALL is set (debug mode)');
+    } else {
+      log({ issueKey, repository }, 'cursor agent skipped: NO_CURSOR_CALL is set (debug mode)');
+    }
+    return;
+  }
+
   const auth = Buffer.from(`${apiKey}:`).toString('base64');
 
   fetch(CURSOR_AGENTS_URL, {
@@ -53,8 +92,15 @@ export function launchAgent({ promptText, issueKey, repo, log = console }) {
     .then(async (res) => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const payload = { status: res.status, body: data, issueKey };
-        if (typeof log.info === 'function') log.info(payload, 'cursor agent launch failed');
+        const payload = {
+          status: res.status,
+          statusText: res.statusText,
+          body: data,
+          issueKey,
+          url: CURSOR_AGENTS_URL,
+        };
+        if (typeof log.error === 'function') log.error(payload, 'cursor agent launch failed');
+        else if (typeof log.info === 'function') log.info(payload, 'cursor agent launch failed');
         else log(payload, 'cursor agent launch failed');
         return;
       }
@@ -63,8 +109,15 @@ export function launchAgent({ promptText, issueKey, repo, log = console }) {
       else log(payload, 'cursor agent launched');
     })
     .catch((err) => {
-      const payload = { err: err.message, issueKey };
-      if (typeof log.info === 'function') log.info(payload, 'cursor agent request error');
+      const payload = {
+        err: err.message,
+        name: err?.name,
+        cause: err?.cause?.message ?? err?.cause,
+        issueKey,
+        url: CURSOR_AGENTS_URL,
+      };
+      if (typeof log.error === 'function') log.error(payload, 'cursor agent request error');
+      else if (typeof log.info === 'function') log.info(payload, 'cursor agent request error');
       else log(payload, 'cursor agent request error');
     });
 }
