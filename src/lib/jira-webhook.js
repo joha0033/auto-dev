@@ -25,6 +25,7 @@ function isInProgress(name) {
  * @returns {{ detected: boolean, issueKey?: string, from?: string, to?: string, debug?: { webhookEvent?: string, statusFrom?: string, statusTo?: string, hasStatusChange: boolean } }}
  */
 export function detectTodoToInProgress(payload) {
+  logger.info({ payload }, 'detectTodoToInProgress');
   const issueKey = payload?.issue?.key;
   const webhookEvent = payload?.webhookEvent;
 

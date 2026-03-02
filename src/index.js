@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { Readable } from 'stream';
 import Fastify from 'fastify';
+import { logger } from './lib/logger.js';
 import { jiraWebhook } from './routes/webhooks/jira.js';
 
 const fastify = Fastify({ logger: false });
@@ -20,11 +21,14 @@ fastify.get('/', async () => ({ hello: 'world' }));
 fastify.get('/health', async () => ({ status: 'ok' }));
 
 fastify.post('/webhooks/jira', jiraWebhook);
+const port = process.env.PORT || 3000;
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
-  } catch {
+    await fastify.listen({ port, host: '0.0.0.0' });
+    logger.info({ port }, 'Server listening');
+  } catch (err) {
+    logger.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 };

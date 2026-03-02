@@ -37,6 +37,7 @@ export function launchAgent({ promptText, issueKey, repo }) {
 
   const auth = Buffer.from(`${apiKey}:`).toString('base64');
 
+  logger.info({ body }, 'launchAgent');
   fetch(CURSOR_AGENTS_URL, {
     method: 'POST',
     headers: {

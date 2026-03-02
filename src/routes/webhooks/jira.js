@@ -4,25 +4,11 @@ import { getPromptFromJiraPayload } from '../../lib/jira-prompt.js';
 import { detectTodoToInProgress } from '../../lib/jira-webhook.js';
 import { verifyJiraSignature } from '../../lib/verify-jira-signature.js';
 
-const dedupeStore = createDedupeStore();
 
-/** Debounce Cursor agent launches per issue (Jira often sends two webhooks for one transition). */
-const LAUNCH_DEBOUNCE_MS = 2 * 60 * 1000; // 2 min
-const recentLaunches = new Map(); // issueKey -> timestamp
+const dedupeStore = createDedupeStore();
 
 const WEBHOOK_ID_HEADER = 'x-atlassian-webhook-identifier';
 const SIGNATURE_HEADER = 'x-hub-signature';
-
-function wasRecentlyLaunched(issueKey) {
-  const now = Date.now();
-  for (const [key, ts] of recentLaunches.entries()) {
-    if (now - ts > LAUNCH_DEBOUNCE_MS) recentLaunches.delete(key);
-  }
-  const last = recentLaunches.get(issueKey);
-  if (last != null && now - last < LAUNCH_DEBOUNCE_MS) return true;
-  recentLaunches.set(issueKey, now);
-  return false;
-}
 
 /**
  * Jira Cloud webhook listener for task moved from To Do → In Progress.
@@ -49,7 +35,9 @@ export async function jiraWebhook(request, reply) {
   if (webhookId) dedupeStore.add(webhookId);
 
   const body = request.body ?? {};
+  logger.info({ body }, 'jiraWebhook');
   const transition = detectTodoToInProgress(body);
+  logger.info({ transition }, 'detectTodoToInProgress');
 
   if (transition.detected) {
     const ghRepoField = process.env.JIRA_GH_REPO_FIELD;
@@ -69,7 +57,9 @@ export async function jiraWebhook(request, reply) {
       ghRepoField,
     });
 
-    if (prompt && !wasRecentlyLaunched(prompt.issueKey)) {
+    logger.info({ prompt }, 'getPromptFromJiraPayload');
+
+    if (prompt) {
       launchAgent({
         promptText: prompt.text,
         issueKey: prompt.issueKey,
