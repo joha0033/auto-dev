@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 /**
  * Detects if a Jira issue_updated payload represents a status change from TODO → In Progress.
  * Jira may send "To Do", "To Do ", "TODO", etc.; we normalize for comparison.
@@ -25,7 +27,7 @@ function isInProgress(name) {
  * @returns {{ detected: boolean, issueKey?: string, from?: string, to?: string, debug?: { webhookEvent?: string, statusFrom?: string, statusTo?: string, hasStatusChange: boolean } }}
  */
 export function detectTodoToInProgress(payload) {
-  logger.info({ payload }, 'detectTodoToInProgress');
+  logger.debug({ payload }, 'detectTodoToInProgress');
   const issueKey = payload?.issue?.key;
   const webhookEvent = payload?.webhookEvent;
 

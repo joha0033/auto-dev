@@ -1,3 +1,5 @@
+import { logger } from './logger.js';
+
 /**
  * Launch a Cursor Cloud Agent via the Cloud Agents API.
  * Uses CURSOR_API_KEY and CURSOR_REF from env. Repository: ticket field gh_repo, else CURSOR_REPO.
