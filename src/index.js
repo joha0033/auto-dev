@@ -1,32 +1,31 @@
 import 'dotenv/config';
-import { Readable } from 'stream';
 import Fastify from 'fastify';
+import fastifyRawBody from 'fastify-raw-body';
+import { logger } from './lib/logger.js';
 import { jiraWebhook } from './routes/webhooks/jira.js';
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({ logger: false });
 
-const JIRA_WEBHOOK_PATHS = ['/webhooks/jira', '/webooks/jira'];
-
-fastify.addHook('preParsing', async (request, reply, payload) => {
-  const path = request.url?.split('?')[0];
-  if (request.method !== 'POST' || !JIRA_WEBHOOK_PATHS.includes(path)) return payload;
-  const chunks = [];
-  for await (const chunk of payload) chunks.push(chunk);
-  const raw = Buffer.concat(chunks);
-  request.rawBody = raw;
-  return Readable.from(raw);
+await fastify.register(fastifyRawBody, {
+  field: 'rawBody',
+  global: false,
+  encoding: false,
+  routes: ['/webhooks/jira'],
 });
 
 fastify.get('/', async () => ({ hello: 'world' }));
 
+fastify.get('/health', async () => ({ status: 'ok' }));
+
 fastify.post('/webhooks/jira', jiraWebhook);
-fastify.post('/webooks/jira', jiraWebhook);
+const port = process.env.PORT || 3000;
 
 const start = async () => {
   try {
-    await fastify.listen({ port: 3000, host: '0.0.0.0' });
+    await fastify.listen({ port, host: '0.0.0.0' });
+    logger.info({ port }, 'Server listening');
   } catch (err) {
-    fastify.log.error(err);
+    logger.error({ err }, 'Failed to start server');
     process.exit(1);
   }
 };

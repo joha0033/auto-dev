@@ -46,14 +46,36 @@ function descriptionToPlainText(description) {
 }
 
 /**
- * Normalize a repo value from Jira (e.g. "org/repo" or full URL) to a full GitHub URL.
- * @param {string} value - gh_repo from Jira
+ * Extract the first URL from a Jira smart-link style value.
+ * Example: "[https://github.com/org/repo%7Chttps://...%7Csmart-link]" -> "https://github.com/org/repo"
+ * @param {string} value - raw custom field value (may be URL-encoded, brackets, pipe-separated)
+ * @returns {string|null} - first URL or null
+ */
+function extractUrlFromSmartLink(value) {
+  if (value == null || typeof value !== 'string') return null;
+  let s = value.trim();
+  if (!s) return null;
+  try {
+    s = decodeURIComponent(s);
+  } catch {
+    // leave as-is if not valid encoded
+  }
+  const urlMatch = s.match(/https?:\/\/[^\s|\]\[]+/);
+  return urlMatch ? urlMatch[0] : null;
+}
+
+/**
+ * Normalize a repo value from Jira (e.g. "org/repo", full URL, or smart-link) to a full GitHub URL.
+ * @param {string} value - gh_repo from Jira (plain string or smart-link format)
  * @returns {string|null} - https://github.com/org/repo or null if invalid
  */
 function normalizeRepoUrl(value) {
   if (value == null || typeof value !== 'string') return null;
-  const s = value.trim();
+  let s = value.trim();
   if (!s) return null;
+  // Jira smart-link format: [url|url|label] — extract first URL
+  const fromSmartLink = extractUrlFromSmartLink(s);
+  if (fromSmartLink) s = fromSmartLink;
   if (s.startsWith('http://') || s.startsWith('https://')) return s;
   if (/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/.test(s)) return `https://github.com/${s}`;
   return null;
@@ -84,7 +106,8 @@ export function getPromptFromJiraPayload(payload, options = {}) {
 
   if (!text || !text.trim()) return null;
 
-  const { jiraBaseUrl, ghRepoField = 'gh_repo' } = options;
+
+  const { jiraBaseUrl, ghRepoField } = options;
   if (jiraBaseUrl) {
     const ticketUrl = `${jiraBaseUrl.replace(/\/$/, '')}/browse/${issueKey}`;
     text += `\n\nIn the pull request description, include a link to the Jira ticket: ${ticketUrl}`;
