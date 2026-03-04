@@ -110,7 +110,15 @@ export function getPromptFromJiraPayload(payload, options = {}) {
   const { jiraBaseUrl, ghRepoField } = options;
   if (jiraBaseUrl) {
     const ticketUrl = `${jiraBaseUrl.replace(/\/$/, '')}/browse/${issueKey}`;
-    text += `\n\nIn the pull request description, include a link to the Jira ticket: ${ticketUrl}`;
+    const githubRepoPRTemplate = `<change description>
+
+---
+
+### JIRA Issue: ${ticketUrl}
+
+---`
+    
+    text += `\n\nGitHub PR template:\n${githubRepoPRTemplate}`;
   }
 
   const repoValue = fields[ghRepoField];
