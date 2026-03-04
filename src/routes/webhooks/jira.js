@@ -44,16 +44,10 @@ export async function jiraWebhook(request, reply) {
 
     const body = request.body ?? {};
     const transition = detectTodoToInProgress(body);
-    logger.info({ transition, webhookId }, 'jiraWebhook transition detected');
 
     if (transition.detected) {
       const ghRepoField = process.env.JIRA_GH_REPO_FIELD;
       const fields = body?.issue?.fields ?? {};
-
-      if (!ghRepoField) {
-        logger.debug({ webhookId }, 'jiraWebhook JIRA_GH_REPO_FIELD not set, skipping agent');
-        return reply.code(200).send({ received: true });
-      }
 
       const repoValue = fields[ghRepoField];
       if (repoValue == null || repoValue === '') {
@@ -74,7 +68,6 @@ export async function jiraWebhook(request, reply) {
           issueKey: prompt.issueKey,
           repo: prompt.repo,
         });
-        logger.info({ issueKey: prompt.issueKey, repo: prompt.repo }, 'jiraWebhook agent launched');
       }
     }
 
